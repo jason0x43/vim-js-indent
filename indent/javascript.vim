@@ -9,6 +9,15 @@
 " Credits:
 "	javascript.vim (2011 May 15) from Preston Koprivica
 
+" Options: {{{
+
+" set to 1 to make case statements align with the containing switch
+if !exists('g:js_indent_flat_switch')
+	let g:js_indent_flat_switch = 0
+endif
+
+" }}}
+
 " Setup: {{{
 
 " Only load one indent script per buffer
@@ -18,7 +27,7 @@ endif
 let b:did_indent = 1
 
 setlocal indentexpr=GetJsIndent(v:lnum)
-setlocal indentkeys=],),}
+setlocal indentkeys=0],0),0},:,!^F,o,O,e
 
 setlocal cindent
 setlocal autoindent
@@ -33,6 +42,94 @@ let s:js_line_comment = s:js_end_line_comment
 
 " Comment/string syntax key
 let s:syn_comment = '\(Comment\|String\|Regexp\)'
+" }}}
+
+" Indenter: {{{
+function! GetJsIndent(lnum)
+	echom 'getting js indent'
+
+	" Grab the number of the first non-comment line prior to lnum
+	let pnum = s:GetNonCommentLine(a:lnum-1)
+
+	" First line, start at indent = 0
+	if pnum == 0
+		echom 'first line -- returning'
+		return 0
+	endif
+
+	" Grab the prior prior non-comment line number
+	let ppnum = s:GetNonCommentLine(pnum-1)
+
+	let line = getline(a:lnum)
+	let pline = getline(pnum)
+	let ppline = getline(ppnum)
+
+	" Determine the current level of indentation
+	let ind = indent(pnum)
+
+	if s:IsSwitchBeginSameLine(pline)
+		" switch begin
+		echom 'begin switch'
+		return ind + (g:js_indent_flat_switch ? 0 : &sw)
+	elseif s:IsObjectEnd(line) && !s:IsComment(a:lnum)
+		" object end
+		echom 'end object'
+		return indent(s:GetObjectBeg(a:lnum))
+	elseif s:IsObjectBeg(pline) 
+		" first line inside object
+		echom 'begin object'
+		return ind + &sw
+	elseif s:IsArrayEnd(line) && !s:IsComment(a:lnum)
+		" array end
+		echom 'end array'
+		return indent(s:GetArrayBeg(a:lnum))
+	elseif s:IsArrayBeg(pline) 
+		" first line inside array
+		echom 'begin array'
+		return ind + &sw 
+	elseif s:IsParenEnd(line) && !s:IsComment(a:lnum)
+		" parenthetical end
+		echom 'end paren'
+		return indent(s:GetParenBeg(a:lnum))
+	elseif s:IsParenBeg(pline) 
+		" parenthetical begin
+		echom 'begin paren'
+		return ind + &sw 
+	elseif s:IsContinuationLine(pline) 
+		" first continuation line
+		echom 'continuation'
+		return indent(s:GetContinuationBegin(pnum)) + &sw
+	elseif s:IsContinuationLine(ppline)
+		" second continuation line
+		echom 'prior-prior continuation'
+		return ind - &sw
+	elseif s:IsSwitchMid(pline) && !(s:IsSwitchMid(line) || s:IsObjectEnd(line))
+		" first line in case block
+		echom 'in switch mid'
+		return ind + &sw
+	elseif s:IsSwitchMid(line)
+		" case label
+		echom 'case label'
+		return ind - &sw
+	elseif s:IsControlBeg(pline) && !(s:IsControlMid(line) || line =~ '^\s*{\s*$')
+		" control statements
+		echom 'control beg'
+		return ind + &sw
+	elseif s:IsControlMid(pline) && !(s:IsControlMid(line) || s:IsObjectBeg(line))
+		echom 'prior control mid'
+		return ind + &sw
+	elseif s:IsControlMid(line) && !(s:IsControlEnd(pline) || s:IsObjectEnd(pline))
+		echom 'control mid'
+		return ind - &sw
+	elseif (s:IsControlBeg(ppline) || s:IsControlMid(ppline)) &&
+			\ !(s:IsObjectBeg(pline) || s:IsObjectEnd(pline))
+		echom 'prior-prior control beg or mid'
+		return ind - &sw
+	endif
+
+	echom 'no match'
+	return ind
+endfunction
 " }}}
 
 " Auxiliary functions: {{{
@@ -78,7 +175,7 @@ function! s:SearchForPair(lnum, beg, end)
 
 	" Set the cursor position to the beginning of the line (default
 	" behavior when using ==)
-	call cursor(a:lnum, 0)
+	call cursor(a:lnum, 1)
 
 	" Search for the opening tag
 	let mnum = searchpair(a:beg, '', a:end, 'bW', 
@@ -88,120 +185,6 @@ function! s:SearchForPair(lnum, beg, end)
 	call cursor(curpos)
 	
 	return mnum
-endfunction
-" }}}
-
-" GetJsIndent {{{
-function! GetJsIndent(lnum)
-	" Grab the number of the first non-comment line prior to lnum
-	let pnum = s:GetNonCommentLine(a:lnum-1)
-
-	" First line, start at indent = 0
-	if pnum == 0
-		return 0
-	endif
-
-	" Grab the prior prior non-comment line number
-	let ppnum = s:GetNonCommentLine(pnum-1)
-
-	let line = getline(a:lnum)
-	let pline = getline(pnum)
-	let ppline = getline(ppnum)
-
-	" Determine the current level of indentation
-	let ind = indent(pnum)
-
-	" Object Closer (closing brace) {{{
-	if s:IsObjectEnd(line) && !s:IsComment(a:lnum)
-		let beg = s:GetObjectBeg(a:lnum)
-		return indent(beg)
-	endif
-
-	if s:IsObjectBeg(pline) 
-		return ind + &sw 
-	endif
-	" }}}
-
-	" Array Closer (closing square bracket) {{{
-	if s:IsArrayEnd(line) && !s:IsComment(a:lnum)
-		let beg = s:GetArrayBeg(a:lnum)
-		return indent(beg)
-	endif
-
-	if s:IsArrayBeg(pline) 
-		return ind + &sw 
-	endif
-	" }}}
-
-	" Parens {{{
-	if s:IsParenEnd(line) && !s:IsComment(a:lnum)
-		let beg = s:GetParenBeg(a:lnum)
-		return indent(beg)
-	endif
-
-	if s:IsParenBeg(pline) 
-		return ind + &sw 
-	endif
-	"}}}
-
-	" Continuation lines {{{
-	if s:IsContinuationLine(pline) 
-		let beg = s:GetContinuationBegin(pnum)
-		return indent(beg) + &sw
-	endif
-
-	if s:IsContinuationLine(ppline)
-		return ind - &sw
-	endif
-	"}}}
-
-	" Switch blocks {{{
-	if s:IsSwitchMid(pline) 
-		if s:IsSwitchMid(line) || s:IsObjectEnd(line)
-			return ind
-		else
-			return ind + &sw
-		endif 
-	endif
-
-	if s:IsSwitchMid(line)
-		return ind - &sw
-	endif
-	"}}}
-	
-	" Single Line Control Blocks {{{
-	if s:IsControlBeg(pline)
-		if s:IsControlMid(line) || line =~ '^\s*{\s*$'
-			return ind
-		else
-			return ind + &sw
-		endif
-	endif
-
-	if s:IsControlMid(pline)
-		if s:IsControlMid(line) || s:IsObjectBeg(line)
-			return ind
-		else
-			return ind + &sw
-		endif
-	endif
-
-	if s:IsControlMid(line)
-		if s:IsControlEnd(pline) || s:IsObjectEnd(pline)
-			return ind
-		else
-			return ind - &sw
-		endif
-	endif
-
-	if (s:IsControlBeg(ppline) || s:IsControlMid(ppline)) &&
-			\ !s:IsObjectBeg(pline) && !s:IsObjectEnd(pline)
-		return ind - &sw
-	endif
-	"}}}
-
-	" no match
-	return ind
 endfunction
 " }}}
 
