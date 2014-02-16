@@ -17,11 +17,6 @@ if exists('b:did_indent')
 endif
 let b:did_indent = 1
 
-" Set the global log variable 1 = logging enabled, 0 = logging disabled
-if !exists("g:js_indent_log")
-	let g:js_indent_log = 0
-endif
-
 setlocal indentexpr=GetJsIndent(v:lnum)
 setlocal indentkeys=],),}
 
