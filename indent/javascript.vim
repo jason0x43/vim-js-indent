@@ -16,6 +16,11 @@ if !exists('g:js_indent_flat_switch')
 	let g:js_indent_flat_switch = 0
 endif
 
+" set to 1 to make case statements align with the containing switch
+if !exists('g:js_indent_logging')
+	let g:js_indent_logging = 0
+endif
+
 " }}}
 
 " Setup: {{{
@@ -46,14 +51,14 @@ let s:syn_comment = '\(Comment\|String\|Regexp\)'
 
 " Indenter: {{{
 function! GetJsIndent(lnum)
-	echom 'getting js indent'
+	call s:Log('starting indent')
 
 	" Grab the number of the first non-comment line prior to lnum
 	let pnum = s:GetNonCommentLine(a:lnum-1)
 
 	" First line, start at indent = 0
 	if pnum == 0
-		echom 'first line -- returning'
+		call s:Log('first line -- returning')
 		return 0
 	endif
 
@@ -67,67 +72,71 @@ function! GetJsIndent(lnum)
 	" Determine the current level of indentation
 	let ind = indent(pnum)
 
-	if s:IsSwitchBeginSameLine(pline)
+	if s:IsVarBlockBegin(pline)
+		" start of var block
+		call s:Log('var block')
+		return ind + &sw
+	elseif s:IsSwitchBeginSameLine(pline)
 		" switch begin
-		echom 'begin switch'
+		s:Log('begin switch')
 		return ind + (g:js_indent_flat_switch ? 0 : &sw)
 	elseif s:IsObjectEnd(line) && !s:IsComment(a:lnum)
 		" object end
-		echom 'end object'
+		call s:Log('end object')
 		return indent(s:GetObjectBeg(a:lnum))
 	elseif s:IsObjectBeg(pline) 
 		" first line inside object
-		echom 'begin object'
+		call s:Log('begin object')
 		return ind + &sw
 	elseif s:IsArrayEnd(line) && !s:IsComment(a:lnum)
 		" array end
-		echom 'end array'
+		call s:Log('end array')
 		return indent(s:GetArrayBeg(a:lnum))
 	elseif s:IsArrayBeg(pline) 
 		" first line inside array
-		echom 'begin array'
+		call s:Log('begin array')
 		return ind + &sw 
 	elseif s:IsParenEnd(line) && !s:IsComment(a:lnum)
 		" parenthetical end
-		echom 'end paren'
+		call s:Log('end paren')
 		return indent(s:GetParenBeg(a:lnum))
 	elseif s:IsParenBeg(pline) 
 		" parenthetical begin
-		echom 'begin paren'
+		call s:Log('begin paren')
 		return ind + &sw 
 	elseif s:IsContinuationLine(pline) 
 		" first continuation line
-		echom 'continuation'
+		call s:Log('continuation')
 		return indent(s:GetContinuationBegin(pnum)) + &sw
 	elseif s:IsContinuationLine(ppline)
 		" second continuation line
-		echom 'prior-prior continuation'
+		call s:Log('prior-prior continuation')
 		return ind - &sw
 	elseif s:IsSwitchMid(pline) && !(s:IsSwitchMid(line) || s:IsObjectEnd(line))
 		" first line in case block
-		echom 'in switch mid'
+		call s:Log('in switch mid')
 		return ind + &sw
 	elseif s:IsSwitchMid(line)
 		" case label
-		echom 'case label'
+		call s:Log('case label')
 		return ind - &sw
 	elseif s:IsControlBeg(pline) && !(s:IsControlMid(line) || line =~ '^\s*{\s*$')
 		" control statements
-		echom 'control beg'
+		call s:Log('control beg')
 		return ind + &sw
 	elseif s:IsControlMid(pline) && !(s:IsControlMid(line) || s:IsObjectBeg(line))
-		echom 'prior control mid'
+		call s:Log('prior control mid')
 		return ind + &sw
 	elseif s:IsControlMid(line) && !(s:IsControlEnd(pline) || s:IsObjectEnd(pline))
-		echom 'control mid'
+		call s:Log('control mid')
 		return ind - &sw
 	elseif (s:IsControlBeg(ppline) || s:IsControlMid(ppline)) &&
 			\ !(s:IsObjectBeg(pline) || s:IsObjectEnd(pline))
-		echom 'prior-prior control beg or mid'
+		call s:Log('prior-prior control beg or mid')
 		return ind - &sw
 	endif
 
-	echom 'no match'
+	call s:Log('no match')
 	return ind
 endfunction
 " }}}
@@ -187,6 +196,14 @@ function! s:SearchForPair(lnum, beg, end)
 	return mnum
 endfunction
 " }}}
+
+" Log {{{
+function! s:Log(msg)
+	if g:js_indent_logging
+		echom a:msg
+	endif
+endfunction
+"}}}
 
 " }}}
 
@@ -302,6 +319,14 @@ endfunction
 
 function! s:IsControlEnd(line)
 	return a:line =~ s:cntrl_end
+endfunction
+" }}}
+
+" Var block helpers {{{
+let s:var_block_beg = '\<var \w\+\>.*,' . s:js_end_line_comment . '$'
+
+function! s:IsVarBlockBegin(line)
+	return a:line =~ s:var_block_beg
 endfunction
 " }}}
 
