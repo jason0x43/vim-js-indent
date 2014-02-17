@@ -73,65 +73,52 @@ function! GetJsIndent(lnum)
 	let ind = indent(pnum)
 
 	if s:IsVarBlockBegin(pline)
-		" start of var block
-		call s:Log('var block')
+		call s:Log('var block begin')
 		return ind + &sw
-	elseif s:IsSwitchBeginSameLine(pline) && !s:IsObjectEnd(line)
-		" switch begin
+	elseif s:IsSwitchBeginSameLine(pline) && !s:IsBlockEnd(line)
 		s:Log('begin switch')
 		return ind + (g:js_indent_flat_switch ? 0 : &sw)
-	elseif s:IsObjectEnd(line) && !s:IsComment(a:lnum)
-		" object end
-		call s:Log('end object')
-		return indent(s:GetObjectBeg(a:lnum))
-	elseif s:IsObjectBeg(pline) 
-		" first line inside object
-		call s:Log('begin object')
+	elseif s:IsBlockEnd(line) && !s:IsComment(a:lnum)
+		call s:Log('end block')
+		return indent(s:GetBlockBeg(a:lnum))
+	elseif s:IsBlockBeg(pline) 
+		call s:Log('begin block')
 		return ind + &sw
 	elseif s:IsArrayEnd(line) && !s:IsComment(a:lnum)
-		" array end
 		call s:Log('end array')
 		return indent(s:GetArrayBeg(a:lnum))
 	elseif s:IsArrayBeg(pline) 
-		" first line inside array
 		call s:Log('begin array')
 		return ind + &sw 
 	elseif s:IsParenEnd(line) && !s:IsComment(a:lnum)
-		" parenthetical end
-		call s:Log('end paren')
+		call s:Log('end parens')
 		return indent(s:GetParenBeg(a:lnum))
 	elseif s:IsParenBeg(pline) 
-		" parenthetical begin
-		call s:Log('begin paren')
+		call s:Log('begin parens')
 		return ind + &sw 
 	elseif s:IsContinuationLine(pline) 
-		" first continuation line
-		call s:Log('continuation')
+		call s:Log('first continuation line')
 		return indent(s:GetContinuationBegin(pnum)) + &sw
 	elseif s:IsContinuationLine(ppline)
-		" second continuation line
-		call s:Log('prior-prior continuation')
+		call s:Log('second continuation line')
 		return ind - &sw
-	elseif s:IsSwitchMid(pline) && !(s:IsSwitchMid(line) || s:IsObjectEnd(line))
-		" first line in case block
-		call s:Log('in switch mid')
+	elseif s:IsSwitchMid(pline) && !(s:IsSwitchMid(line) || s:IsBlockEnd(line))
+		call s:Log('first line in case block')
 		return ind + &sw
 	elseif s:IsSwitchMid(line)
-		" case label
 		call s:Log('case label')
 		return ind - &sw
 	elseif s:IsControlBeg(pline) && !(s:IsControlMid(line) || line =~ '^\s*{\s*$')
-		" control statements
-		call s:Log('control beg')
+		call s:Log('first line in a control statement')
 		return ind + &sw
-	elseif s:IsControlMid(pline) && !(s:IsControlMid(line) || s:IsObjectBeg(line))
-		call s:Log('prior control mid')
+	elseif s:IsControlMid(pline) && !(s:IsControlMid(line) || s:IsBlockBeg(line))
+		call s:Log('non-block begin within control statement')
 		return ind + &sw
-	elseif s:IsControlMid(line) && !(s:IsControlEnd(pline) || s:IsObjectEnd(pline))
-		call s:Log('control mid')
+	elseif s:IsControlMid(line) && !(s:IsControlEnd(pline) || s:IsBlockEnd(pline))
+		call s:Log('within control statement')
 		return ind - &sw
 	elseif (s:IsControlBeg(ppline) || s:IsControlMid(ppline)) &&
-			\ !(s:IsObjectBeg(pline) || s:IsObjectEnd(pline))
+			\ !(s:IsBlockBeg(pline) || s:IsBlockEnd(pline))
 		call s:Log('prior-prior control beg or mid')
 		return ind - &sw
 	endif
@@ -209,19 +196,19 @@ endfunction
 
 " Helper functions: {{{
 
-" Object helpers {{{
+" Block helpers {{{
 let s:object_beg = '{[^}]*' . s:js_end_line_comment . '$'
 let s:object_end = '^' . s:js_mid_line_comment . '}[;,]\='
 
-function! s:IsObjectBeg(line)
+function! s:IsBlockBeg(line)
 	return a:line =~ s:object_beg
 endfunction
 
-function! s:IsObjectEnd(line)
+function! s:IsBlockEnd(line)
 	return a:line =~ s:object_end
 endfunction 
 
-function! s:GetObjectBeg(lnum)
+function! s:GetBlockBeg(lnum)
 	return s:SearchForPair(a:lnum, '{', '}')
 endfunction
 " }}}
