@@ -76,7 +76,7 @@ function! GetJsIndent(lnum)
 		" start of var block
 		call s:Log('var block')
 		return ind + &sw
-	elseif s:IsSwitchBeginSameLine(pline)
+	elseif s:IsSwitchBeginSameLine(pline) && !s:IsObjectEnd(line)
 		" switch begin
 		s:Log('begin switch')
 		return ind + (g:js_indent_flat_switch ? 0 : &sw)
