@@ -51,7 +51,7 @@ let s:syn_comment = '\(Comment\|String\|Regexp\)'
 
 " Indenter: {{{
 function! GetJsIndent(lnum)
-	call s:Log('starting indent')
+	call s:Log('starting indent for line ' . a:lnum)
 
 	" Grab the number of the first non-comment line prior to lnum
 	let pnum = s:GetNonCommentLine(a:lnum-1)
@@ -72,7 +72,8 @@ function! GetJsIndent(lnum)
 	" Determine the current level of indentation
 	let ind = indent(pnum)
 
-	if s:IsVarBlockBegin(pline)
+	" Figure out what the indent should be
+	if s:IsVarBlockBegin(pline) && !s:IsStatementEnd(line)
 		call s:Log('var block begin')
 		return ind + &sw
 	elseif s:IsSwitchBeginSameLine(pline) && !s:IsBlockEnd(line)
@@ -96,6 +97,9 @@ function! GetJsIndent(lnum)
 	elseif s:IsParenBeg(pline) 
 		call s:Log('begin parens')
 		return ind + &sw 
+	elseif s:IsStatementEnd(pline) && (s:IsVarBlockBegin(ppline) || s:IsVarBlockMid(ppline))
+		call s:Log('end of var block')
+		return ind - &sw
 	elseif s:IsContinuationLine(pline) 
 		call s:Log('first continuation line')
 		return indent(s:GetContinuationBegin(pnum)) + &sw
@@ -147,13 +151,33 @@ endfunction
 " }}}
 
 " GetNonCommentLine {{{
-" Grab the nearest non-commented line.
+" Grab the nearest prior non-commented line.
 function! s:GetNonCommentLine(lnum)
 	let lnum = prevnonblank(a:lnum)
 
 	while lnum > 0
 		if s:IsComment(lnum)
 			let lnum = prevnonblank(lnum - 1)
+		else
+			return lnum
+		endif
+	endwhile
+
+	return lnum
+endfunction
+" }}}
+
+" FirstCommaLine {{{
+" Grab the first line that starts with a comma in the current block of
+" lines ending with commas.
+function! s:FirstCommaLine(lnum)
+	let lnum = a:lnum
+	let plnum = lnum
+
+	while plnum > 0
+		if s:IsVarBlockMid(plnum)
+			let lnum = plnum
+			let plnum = prevnonblank(plnum - 1)
 		else
 			return lnum
 		endif
@@ -311,9 +335,24 @@ endfunction
 
 " Var block helpers {{{
 let s:var_block_beg = '\<var \w\+\>.*,' . s:js_end_line_comment . '$'
+let s:var_block_mid = ',' . s:js_end_line_comment . '$'
+let s:statement_end = ';' . s:js_end_line_comment . '$'
 
 function! s:IsVarBlockBegin(line)
 	return a:line =~ s:var_block_beg
+endfunction
+
+function! s:IsVarBlockMid(line)
+	return a:line =~ s:var_block_mid
+endfunction
+
+function! s:IsVarBlock(lnum)
+	let first = s:FirstCommaLine(lnum)
+	return s:IsVarBlockBegin(getline(first))
+endfunction
+
+function! s:IsStatementEnd(line)
+	return a:line =~ s:statement_end
 endfunction
 " }}}
 
