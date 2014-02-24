@@ -53,6 +53,19 @@ let s:syn_comment = '\(Comment\|String\|Regexp\)'
 function! GetJsIndent(lnum)
 	call s:Log('starting indent for line ' . a:lnum)
 
+	if s:IsBlockCommentStart(getline(a:lnum))
+		call s:Log('Block comment start')
+		return 0
+	elseif s:IsComment(a:lnum)
+		if s:IsBlockComment(a:lnum)
+			call s:Log('Block comment body')
+			return 1
+		else
+			call s:Log('regular comment')
+			return indent(a:lnum)
+		endif
+	endif
+
 	" Grab the number of the first non-comment line prior to lnum
 	let pnum = s:GetNonCommentLine(a:lnum-1)
 
@@ -65,12 +78,12 @@ function! GetJsIndent(lnum)
 	" Grab the prior prior non-comment line number
 	let ppnum = s:GetNonCommentLine(pnum-1)
 
+	" Determine the current level of indentation
+	let ind = indent(pnum)
+
 	let line = getline(a:lnum)
 	let pline = getline(pnum)
 	let ppline = getline(ppnum)
-
-	" Determine the current level of indentation
-	let ind = indent(pnum)
 
 	" Figure out what the indent should be
 	if s:IsVarBlockBegin(pline) && !s:IsStatementEnd(line)
@@ -147,6 +160,44 @@ function! s:IsComment(lnum)
 	let line = getline(a:lnum)
 	"Doesn't absolutely work.  Only Probably!
 	return s:IsInComment(a:lnum, 1) && s:IsInComment(a:lnum, strlen(line))
+endfunction
+" }}}
+
+" IsInBlockComment {{{
+" Determine whether a line is in a block comment or not.
+function! s:IsInBlockComment(lnum, cnum)
+	return synIDattr(synID(a:lnum, a:cnum, 1), 'name') == 'javascriptComment'
+endfunction
+" }}}
+
+" IsBlockCommentStart {{{
+" Determine whether a line starts a block comment or not.
+function! s:IsBlockCommentStart(line)
+	return a:line =~ '^\s*\/\*\*\(\s\+.*\)\?$'
+endfunction
+" }}}
+
+" IsBlockComment {{{
+" Determine whether a line is in a block comment or not.
+function! s:IsBlockComment(lnum)
+	let line = getline(a:lnum)
+	return s:IsInBlockComment(a:lnum, strlen(line))
+endfunction
+" }}}
+
+" GetBlockCommentStart {{{
+" Get the first line of a javadoc-style comment
+function! s:GetBlockCommentStart(lnum)
+	let lnum = prevnonblank(a:lnum)
+	while lnum > 0
+		if IsBlockCommentStart(getline(lnum))
+			return lnum
+		else
+			let lnum = prevnonblank(lnum - 1)
+		endif
+	endwhile
+
+	return lnum
 endfunction
 " }}}
 
@@ -256,7 +307,7 @@ endfunction
 
 " MultiLine declaration/invocation helpers {{{
 let s:paren_beg = '([^)]*' . s:js_end_line_comment . '$'
-let s:paren_end = '^' . s:js_mid_line_comment . '[^(]*)'
+let s:paren_end = '^' . s:js_mid_line_comment . ')'
 
 function! s:IsParenBeg(line)
 	return a:line =~ s:paren_beg
