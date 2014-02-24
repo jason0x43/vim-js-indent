@@ -38,7 +38,7 @@ let s:js_indent_expr = &indentexpr
 
 setlocal indentexpr=HtmlIndent()
 " @jason0x43: add ) and ] to indentkeys
-setlocal indentkeys=o,O,<Return>,<>>,{,},!^F,),]
+setlocal indentkeys=o,O,<Return>,<>>,{,},!^F,),],:
 
 let b:indent = {"lnum": -1}
 let b:undo_indent = "set inde< indk<| unlet b:indent"
