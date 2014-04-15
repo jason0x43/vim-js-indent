@@ -60,7 +60,8 @@ function! GetJsIndent(lnum)
 		call s:Log('is comment')
 		if s:IsBlockComment(a:lnum)
 			call s:Log('Block comment body')
-			return 1
+			let lnum = prevnonblank(a:lnum)
+			return indent(lnum)
 		else
 			call s:Log('regular comment')
 			return indent(a:lnum)
