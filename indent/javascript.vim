@@ -57,6 +57,7 @@ function! GetJsIndent(lnum)
 		call s:Log('Block comment start')
 		return 0
 	elseif s:IsComment(a:lnum)
+		call s:Log('is comment')
 		if s:IsBlockComment(a:lnum)
 			call s:Log('Block comment body')
 			return 1
