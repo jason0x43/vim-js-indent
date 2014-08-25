@@ -84,7 +84,10 @@ function! GetJsIndent(lnum)
 	let ppline = getline(ppnum)
 
 	" Figure out what the indent should be
-	if s:IsVarBlockBegin(pline) && !s:IsStatementEnd(line)
+    if s:IsSingleComment(line) && s:IsSingleComment(pline)
+        call s:Log('signle comment')
+        return indent(a:lnum)
+    elseif s:IsVarBlockBegin(pline) && !s:IsStatementEnd(pline)
 		call s:Log('var block begin')
 		return ind + &sw
 	elseif s:IsSwitchBeginSameLine(pline) && !s:IsBlockEnd(line)
@@ -108,7 +111,7 @@ function! GetJsIndent(lnum)
 	elseif s:IsParenBeg(pline) 
 		call s:Log('begin parens')
 		return ind + &sw 
-	elseif s:IsStatementEnd(pline) && (s:IsVarBlockBegin(ppline) || s:IsVarBlockMid(ppline))
+	elseif s:IsStatementEnd(pline) && s:IsVarBlockMid(ppline)
 		call s:Log('end of var block')
 		return ind - &sw
 	elseif s:IsContinuationLine(pline) 
@@ -158,6 +161,13 @@ function! s:IsComment(lnum)
 	let line = getline(a:lnum)
 	"Doesn't absolutely work.  Only Probably!
 	return s:IsInComment(a:lnum, 1) && s:IsInComment(a:lnum, strlen(line))
+endfunction
+" }}}
+
+" IsSingleComment {{{
+" Determine whether a line is a single comment or not.
+function! s:IsSingleComment(line)
+	return a:line =~ '^\s*\/\/'
 endfunction
 " }}}
 
@@ -383,7 +393,7 @@ endfunction
 " }}}
 
 " Var block helpers {{{
-let s:var_block_beg = '\<var \w\+\>.*,' . s:js_end_line_comment . '$'
+let s:var_block_beg = '^\s*var\s\+'
 let s:var_block_mid = ',' . s:js_end_line_comment . '$'
 let s:statement_end = ';' . s:js_end_line_comment . '$'
 
