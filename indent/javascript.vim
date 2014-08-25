@@ -1,8 +1,8 @@
 " Vim indent script for JavaScript
 " General:
 " File:			javascript.vim
-" Maintainer:	Jason Cheatham
-" Last Change: 	2014-02-15
+" Maintainer:	Jason Cheatham & Alvan
+" Last Change: 	2014-08-25
 " Description:
 " 	JavaScript indenter.
 "
@@ -55,16 +55,12 @@ function! GetJsIndent(lnum)
 
 	if s:IsBlockCommentStart(getline(a:lnum))
 		call s:Log('Block comment start')
-		return 0
 	elseif s:IsComment(a:lnum)
 		call s:Log('is comment')
 		if s:IsBlockComment(a:lnum)
 			call s:Log('Block comment body')
-			let lnum = prevnonblank(a:lnum)
-			return indent(lnum)
-		else
-			call s:Log('regular comment')
-			return indent(a:lnum)
+			let lnum = prevnonblank(a:lnum - 1)
+            return indent(lnum) + (s:IsBlockCommentStart(getline(lnum)) ? 1 : 0)
 		endif
 	endif
 
@@ -88,7 +84,10 @@ function! GetJsIndent(lnum)
 	let ppline = getline(ppnum)
 
 	" Figure out what the indent should be
-	if s:IsVarBlockBegin(pline) && !s:IsStatementEnd(line)
+    if s:IsSingleComment(line) && s:IsSingleComment(pline)
+        call s:Log('signle comment')
+        return indent(a:lnum)
+    elseif s:IsVarBlockBegin(pline) && !s:IsStatementEnd(pline)
 		call s:Log('var block begin')
 		return ind + &sw
 	elseif s:IsSwitchBeginSameLine(pline) && !s:IsBlockEnd(line)
@@ -112,7 +111,7 @@ function! GetJsIndent(lnum)
 	elseif s:IsParenBeg(pline) 
 		call s:Log('begin parens')
 		return ind + &sw 
-	elseif s:IsStatementEnd(pline) && (s:IsVarBlockBegin(ppline) || s:IsVarBlockMid(ppline))
+	elseif s:IsStatementEnd(pline) && s:IsVarBlockMid(ppline)
 		call s:Log('end of var block')
 		return ind - &sw
 	elseif s:IsContinuationLine(pline) 
@@ -165,17 +164,24 @@ function! s:IsComment(lnum)
 endfunction
 " }}}
 
+" IsSingleComment {{{
+" Determine whether a line is a single comment or not.
+function! s:IsSingleComment(line)
+	return a:line =~ '^\s*\/\/'
+endfunction
+" }}}
+
 " IsInBlockComment {{{
 " Determine whether a line is in a block comment or not.
 function! s:IsInBlockComment(lnum, cnum)
-	return synIDattr(synID(a:lnum, a:cnum, 1), 'name') == 'javascriptComment'
+	return synIDattr(synID(a:lnum, a:cnum, 1), 'name') ==? 'javaScriptComment'
 endfunction
 " }}}
 
 " IsBlockCommentStart {{{
 " Determine whether a line starts a block comment or not.
 function! s:IsBlockCommentStart(line)
-	return a:line =~ '^\s*\/\*\*\(\s\+.*\)\?$'
+	return a:line =~ '^\s*\/\*'
 endfunction
 " }}}
 
@@ -387,7 +393,7 @@ endfunction
 " }}}
 
 " Var block helpers {{{
-let s:var_block_beg = '\<var \w\+\>.*,' . s:js_end_line_comment . '$'
+let s:var_block_beg = '^\s*var\s\+'
 let s:var_block_mid = ',' . s:js_end_line_comment . '$'
 let s:statement_end = ';' . s:js_end_line_comment . '$'
 
