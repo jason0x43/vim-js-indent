@@ -1,8 +1,8 @@
 " Vim indent script for JavaScript
 " General:
 " File:			javascript.vim
-" Maintainer:	Jason Cheatham
-" Last Change: 	2014-02-15
+" Maintainer:	Jason Cheatham & Alvan
+" Last Change: 	2014-08-25
 " Description:
 " 	JavaScript indenter.
 "
@@ -55,16 +55,12 @@ function! GetJsIndent(lnum)
 
 	if s:IsBlockCommentStart(getline(a:lnum))
 		call s:Log('Block comment start')
-		return 0
 	elseif s:IsComment(a:lnum)
 		call s:Log('is comment')
 		if s:IsBlockComment(a:lnum)
 			call s:Log('Block comment body')
-			let lnum = prevnonblank(a:lnum)
-			return indent(lnum)
-		else
-			call s:Log('regular comment')
-			return indent(a:lnum)
+			let lnum = prevnonblank(a:lnum - 1)
+            return indent(lnum) + (s:IsBlockCommentStart(getline(lnum)) ? 1 : 0)
 		endif
 	endif
 
@@ -168,14 +164,14 @@ endfunction
 " IsInBlockComment {{{
 " Determine whether a line is in a block comment or not.
 function! s:IsInBlockComment(lnum, cnum)
-	return synIDattr(synID(a:lnum, a:cnum, 1), 'name') == 'javascriptComment'
+	return synIDattr(synID(a:lnum, a:cnum, 1), 'name') ==? 'javaScriptComment'
 endfunction
 " }}}
 
 " IsBlockCommentStart {{{
 " Determine whether a line starts a block comment or not.
 function! s:IsBlockCommentStart(line)
-	return a:line =~ '^\s*\/\*\*\(\s\+.*\)\?$'
+	return a:line =~ '^\s*\/\*'
 endfunction
 " }}}
 
