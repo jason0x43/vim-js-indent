@@ -2,7 +2,7 @@
 " General:
 " File:			javascript.vim
 " Maintainer:	Jason Cheatham
-" Last Change: 	2014-02-15
+" Last Change: 	2014-08-25
 " Description:
 " 	JavaScript indenter.
 "
@@ -42,34 +42,20 @@ setlocal autoindent
 
 " Inline comments (for anchoring other statements)
 let s:js_mid_line_comment = '\s*\(\/\*.*\*\/\)*\s*'
-let s:js_end_line_comment = s:js_mid_line_comment . '\s*\(//.*\)*'
+let s:js_end_line_comment = s:js_mid_line_comment . '\s*\(\/\/.*\)*'
 let s:js_line_comment = s:js_end_line_comment
 
 " Comment/string syntax key
-let s:syn_comment = '\(Comment\|String\|Regexp\)'
+let s:syn_comment = '\(Comment\|String\|Regexp\|jsDoc\)'
 " }}}
 
 " Indenter: {{{
 function! GetJsIndent(lnum)
 	call s:Log('starting indent for line ' . a:lnum)
 
-	if s:IsBlockCommentStart(getline(a:lnum))
-		call s:Log('Block comment start')
-		return 0
-	elseif s:IsComment(a:lnum)
-		call s:Log('is comment')
-		if s:IsBlockComment(a:lnum)
-			call s:Log('Block comment body')
-			let lnum = prevnonblank(a:lnum)
-			return indent(lnum)
-		else
-			call s:Log('regular comment')
-			return indent(a:lnum)
-		endif
-	endif
-
 	" Grab the number of the first non-comment line prior to lnum
-	let pnum = s:GetNonCommentLine(a:lnum-1)
+	let pnum = s:GetNonLineCommentLine(a:lnum-1)
+	call s:Log('previous non-comment line: ' . pnum)
 
 	" First line, start at indent = 0
 	if pnum == 0
@@ -77,47 +63,64 @@ function! GetJsIndent(lnum)
 		return 0
 	endif
 
-	" Grab the prior prior non-comment line number
-	let ppnum = s:GetNonCommentLine(pnum-1)
+	let pline = getline(pnum)
 
 	" Determine the current level of indentation
 	let ind = indent(pnum)
-
-	let line = getline(a:lnum)
-	let pline = getline(pnum)
-	let ppline = getline(ppnum)
+	call s:Log('current indent: ' . ind)
 
 	" Figure out what the indent should be
-	if s:IsVarBlockBegin(pline) && !s:IsStatementEnd(line)
-		call s:Log('var block begin')
+
+	if s:IsBlockCommentStart(pline) && !s:IsBlockCommentEnd(pline)
+		call s:Log('block comment start')
+		return ind + 1
+	endif
+
+	let pnbnum = prevnonblank(a:lnum - 1)
+
+	if s:IsBlockComment(pnbnum) && s:IsBlockCommentEnd(getline(pnbnum))
+		call s:Log('block comment end')
+		return ind - 1
+	elseif s:IsVarBlockStart(pline) && !s:IsStatementEnd(pline)
+		call s:Log('var block start')
 		return ind + &sw
-	elseif s:IsSwitchBeginSameLine(pline) && !s:IsBlockEnd(line)
-		s:Log('begin switch')
+	endif
+
+	let line = getline(a:lnum)
+
+	if s:IsSwitchStartSameLine(pline) && !s:IsBlockEnd(line)
+		s:Log('start switch')
 		return ind + (g:js_indent_flat_switch ? 0 : &sw)
 	elseif s:IsBlockEnd(line) && !s:IsComment(a:lnum)
 		call s:Log('end block')
-		return indent(s:GetBlockBeg(a:lnum))
-	elseif s:IsBlockBeg(pline) 
-		call s:Log('begin block')
+		return indent(s:GetBlockStart(a:lnum))
+	elseif s:IsBlockStart(pline) 
+		call s:Log('start block')
 		return ind + &sw
 	elseif s:IsArrayEnd(line) && !s:IsComment(a:lnum)
 		call s:Log('end array')
-		return indent(s:GetArrayBeg(a:lnum))
-	elseif s:IsArrayBeg(pline) 
-		call s:Log('begin array')
+		return indent(s:GetArrayStart(a:lnum))
+	elseif s:IsArrayStart(pline) 
+		call s:Log('start array')
 		return ind + &sw 
 	elseif s:IsParenEnd(line) && !s:IsComment(a:lnum)
 		call s:Log('end parens')
-		return indent(s:GetParenBeg(a:lnum))
-	elseif s:IsParenBeg(pline) 
-		call s:Log('begin parens')
+		return indent(s:GetParenStart(a:lnum))
+	elseif s:IsParenStart(pline) 
+		call s:Log('start parens')
 		return ind + &sw 
-	elseif s:IsStatementEnd(pline) && (s:IsVarBlockBegin(ppline) || s:IsVarBlockMid(ppline))
+	endif
+
+	" Grab the prior prior non-comment line number
+	let ppline = getline(s:GetNonLineCommentLine(pnum-1))
+	call s:Log('previous-previous non-comment line: ' . ppline)
+
+	if s:IsStatementEnd(pline) && (s:IsVarBlockStart(ppline) || s:IsVarBlockMid(ppline))
 		call s:Log('end of var block')
 		return ind - &sw
 	elseif s:IsContinuationLine(pline) 
 		call s:Log('first continuation line')
-		return indent(s:GetContinuationBegin(pnum)) + &sw
+		return indent(s:GetContinuationStart(pnum)) + &sw
 	elseif s:IsContinuationLine(ppline)
 		call s:Log('second continuation line')
 		return ind - &sw
@@ -127,17 +130,17 @@ function! GetJsIndent(lnum)
 	elseif s:IsSwitchMid(line)
 		call s:Log('case label')
 		return ind - &sw
-	elseif s:IsControlBeg(pline) && !(s:IsControlMid(line) || line =~ '^\s*{\s*$')
+	elseif s:IsControlStart(pline) && !(s:IsControlMid(line) || line =~ '^\s*{\s*$')
 		call s:Log('first line in a control statement')
 		return ind + &sw
-	elseif s:IsControlMid(pline) && !(s:IsControlMid(line) || s:IsBlockBeg(line))
-		call s:Log('non-block begin within control statement')
+	elseif s:IsControlMid(pline) && !(s:IsControlMid(line) || s:IsBlockStart(line))
+		call s:Log('non-block start within control statement')
 		return ind + &sw
 	elseif s:IsControlMid(line) && !(s:IsControlEnd(pline) || s:IsBlockEnd(pline))
 		call s:Log('within control statement')
 		return ind - &sw
-	elseif (s:IsControlBeg(ppline) || s:IsControlMid(ppline)) &&
-			\ !(s:IsBlockBeg(pline) || s:IsBlockEnd(pline))
+	elseif (s:IsControlStart(ppline) || s:IsControlMid(ppline)) &&
+			\ !(s:IsBlockStart(pline) || s:IsBlockEnd(pline))
 		call s:Log('prior-prior control beg or mid')
 		return ind - &sw
 	endif
@@ -161,29 +164,54 @@ endfunction'
 function! s:IsComment(lnum)
 	let line = getline(a:lnum)
 	"Doesn't absolutely work.  Only Probably!
-	return s:IsInComment(a:lnum, 1) && s:IsInComment(a:lnum, strlen(line))
+	let answer = s:IsInComment(a:lnum, 1) && s:IsInComment(a:lnum, strlen(line))
+	call s:Log('line ' . a:lnum . ' is comment? ' . answer)
+	return answer
+endfunction
+" }}}
+
+" IsLineComment {{{
+" Determine whether a line is a comment or not.
+function! s:IsLineComment(line)
+	let answer = a:line =~ '^\s*\/\/'
+	call s:Log('IsLineComment(' . a:line . '): ' . answer)
+	return answer
 endfunction
 " }}}
 
 " IsInBlockComment {{{
 " Determine whether a line is in a block comment or not.
 function! s:IsInBlockComment(lnum, cnum)
-	return synIDattr(synID(a:lnum, a:cnum, 1), 'name') == 'javascriptComment'
+	let lineType = synIDattr(synID(a:lnum, a:cnum, 1), 'name')
+	call s:Log('IsInBlockComment(' . a:lnum . ', ' . a:cnum . '): ' . lineType)
+	return lineType == 'javascriptComment' || lineType =~ '^jsDoc'
 endfunction
 " }}}
 
 " IsBlockCommentStart {{{
 " Determine whether a line starts a block comment or not.
 function! s:IsBlockCommentStart(line)
-	return a:line =~ '^\s*\/\*\*\(\s\+.*\)\?$'
+	let answer = a:line =~ '^\s*\/\*\*\?\(\s\+.*\)\?$'
+	call s:Log('IsBlockCommentStart(' . a:line . '): ' . answer)
+	return answer
+endfunction
+" }}}
+
+" IsBlockCommentEnd {{{
+" Determine whether a line ends a block comment or not.
+function! s:IsBlockCommentEnd(line)
+	let answer = a:line =~ '\*\/'
+	call s:Log('IsBlockCommentEnd(' . a:line . '): ' . answer)
+	return answer
 endfunction
 " }}}
 
 " IsBlockComment {{{
 " Determine whether a line is in a block comment or not.
 function! s:IsBlockComment(lnum)
-	let line = getline(a:lnum)
-	return s:IsInBlockComment(a:lnum, strlen(line))
+	let answer = s:IsInBlockComment(a:lnum, 1)
+	call s:Log('is line ' . a:lnum . ' in a block comment? ' . answer)
+	return answer
 endfunction
 " }}}
 
@@ -205,13 +233,16 @@ endfunction
 
 " GetNonCommentLine {{{
 " Grab the nearest prior non-commented line.
-function! s:GetNonCommentLine(lnum)
+function! s:GetNonLineCommentLine(lnum)
 	let lnum = prevnonblank(a:lnum)
 
 	while lnum > 0
-		if s:IsComment(lnum)
+		call s:Log('checking if line ' . lnum . ' is line comment...')
+		if s:IsLineComment(lnum)
+			call s:Log('line ' . lnum . ' is line comment')
 			let lnum = prevnonblank(lnum - 1)
 		else
+			call s:Log('line ' . lnum . ' is not line comment')
 			return lnum
 		endif
 	endwhile
@@ -262,11 +293,14 @@ endfunction
 " }}}
 
 " Log {{{
-function! s:Log(msg)
-	if g:js_indent_logging
+if g:js_indent_logging
+	function! s:Log(msg)
 		echom a:msg
-	endif
-endfunction
+	endfunction
+else
+	function! s:Log(msg)
+	endfunction
+endif
 "}}}
 
 " }}}
@@ -277,7 +311,7 @@ endfunction
 let s:object_beg = '{[^}]*' . s:js_end_line_comment . '$'
 let s:object_end = '^' . s:js_mid_line_comment . '}[;,]\='
 
-function! s:IsBlockBeg(line)
+function! s:IsBlockStart(line)
 	return a:line =~ s:object_beg
 endfunction
 
@@ -285,7 +319,7 @@ function! s:IsBlockEnd(line)
 	return a:line =~ s:object_end
 endfunction 
 
-function! s:GetBlockBeg(lnum)
+function! s:GetBlockStart(lnum)
 	return s:SearchForPair(a:lnum, '{', '}')
 endfunction
 " }}}
@@ -294,7 +328,7 @@ endfunction
 let s:array_beg = '\[[^\]]*' . s:js_end_line_comment . '$'
 let s:array_end = '^' . s:js_mid_line_comment . '[^\[]*\]'
 
-function! s:IsArrayBeg(line)
+function! s:IsArrayStart(line)
 	return a:line =~ s:array_beg
 endfunction
 
@@ -302,7 +336,7 @@ function! s:IsArrayEnd(line)
 	return a:line =~ s:array_end
 endfunction 
 
-function! s:GetArrayBeg(lnum)
+function! s:GetArrayStart(lnum)
 	return s:SearchForPair(a:lnum, '\[', '\]')
 endfunction
 " }}}
@@ -311,7 +345,7 @@ endfunction
 let s:paren_beg = '([^)]*' . s:js_end_line_comment . '$'
 let s:paren_end = '^' . s:js_mid_line_comment . ')'
 
-function! s:IsParenBeg(line)
+function! s:IsParenStart(line)
 	return a:line =~ s:paren_beg
 endfunction
 
@@ -319,7 +353,7 @@ function! s:IsParenEnd(line)
 	return a:line =~ s:paren_end
 endfunction 
 
-function! s:GetParenBeg(lnum)
+function! s:GetParenStart(lnum)
 	return s:SearchForPair(a:lnum, '(', ')')
 endfunction
 " }}}
@@ -331,7 +365,7 @@ function! s:IsContinuationLine(line)
 	return a:line =~ s:continuation
 endfunction
 
-function! s:GetContinuationBegin(lnum) 
+function! s:GetContinuationStart(lnum) 
 	let cur = a:lnum
 	
 	while s:IsContinuationLine(getline(cur)) 
@@ -347,11 +381,11 @@ let s:switch_beg_next_line = 'switch\s*(.*)\s*' . s:js_mid_line_comment . s:js_e
 let s:switch_beg_same_line = 'switch\s*(.*)\s*' . s:js_mid_line_comment . '{\s*' . s:js_line_comment . '$'
 let s:switch_mid = '^.*\(case.*\|default\)\s*:\s*' 
 
-function! s:IsSwitchBeginNextLine(line) 
+function! s:IsSwitchStartNextLine(line) 
 	return a:line =~ s:switch_beg_next_line 
 endfunction
 
-function! s:IsSwitchBeginSameLine(line) 
+function! s:IsSwitchStartSameLine(line) 
 	return a:line =~ s:switch_beg_same_line 
 endfunction
 
@@ -369,7 +403,7 @@ let s:cntrl_mid = s:cntrl_mid_keys . s:js_end_line_comment . '$'
 
 let s:cntrl_end = '\(while\s*(.*)\)\s*;\=\s*' . s:js_end_line_comment . '$'
 
-function! s:IsControlBeg(line)
+function! s:IsControlStart(line)
 	return a:line =~ s:cntrl_beg
 endfunction
 
@@ -387,12 +421,14 @@ endfunction
 " }}}
 
 " Var block helpers {{{
-let s:var_block_beg = '\<var \w\+\>.*,' . s:js_end_line_comment . '$'
+let s:var_block_beg = '\<var\s\+\w\+\>.*,' . s:js_end_line_comment . '$'
 let s:var_block_mid = ',' . s:js_end_line_comment . '$'
 let s:statement_end = ';' . s:js_end_line_comment . '$'
 
-function! s:IsVarBlockBegin(line)
-	return a:line =~ s:var_block_beg
+function! s:IsVarBlockStart(line)
+	let answer = a:line =~ s:var_block_beg
+	call s:Log('checking if var block start: ' . answer)
+	return answer
 endfunction
 
 function! s:IsVarBlockMid(line)
@@ -401,11 +437,15 @@ endfunction
 
 function! s:IsVarBlock(lnum)
 	let first = s:FirstCommaLine(lnum)
-	return s:IsVarBlockBegin(getline(first))
+	let answer = s:IsVarBlockStart(getline(first))
+	call s:Log('is var block: ' . answer)
+	return answer
 endfunction
 
 function! s:IsStatementEnd(line)
-	return a:line =~ s:statement_end
+	let answer = a:line =~ s:statement_end
+	call s:Log('is statement end: ' . answer)
+	return answer
 endfunction
 " }}}
 
