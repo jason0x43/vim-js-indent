@@ -2,12 +2,13 @@
 " General:
 " File:			javascript.vim
 " Maintainer:	Jason Cheatham
-" Last Change: 	2014-08-25
+" Last Change: 	2014-08-26
 " Description:
 " 	JavaScript indenter.
 "
 " Credits:
 "	javascript.vim (2011 May 15) from Preston Koprivica
+"	Improvements to comment handling by @Alvan (2014 Aug 26)
 
 " Options: {{{
 
@@ -78,9 +79,18 @@ function! GetJsIndent(lnum)
 
 	let pnbnum = prevnonblank(a:lnum - 1)
 
-	if s:IsBlockComment(pnbnum) && s:IsBlockCommentEnd(getline(pnbnum))
-		call s:Log('block comment end')
-		return ind - 1
+    if s:IsLineComment(getline(a:lnum)) && s:IsLineComment(getline(pnbnum))
+        return indent(pnbnum)
+    endif
+
+    if s:IsBlockComment(pnbnum)
+        if s:IsBlockCommentEnd(getline(pnbnum))
+            call s:Log('block comment end')
+            return ind - 1
+        else
+            call s:Log('block comment')
+            return ind
+        endif
 	elseif s:IsVarBlockStart(pline) && !s:IsStatementEnd(pline)
 		call s:Log('var block start')
 		return ind + &sw
@@ -184,7 +194,7 @@ endfunction
 function! s:IsInBlockComment(lnum, cnum)
 	let lineType = synIDattr(synID(a:lnum, a:cnum, 1), 'name')
 	call s:Log('IsInBlockComment(' . a:lnum . ', ' . a:cnum . '): ' . lineType)
-	return lineType == 'javascriptComment' || lineType =~ '^jsDoc'
+	return lineType ==? 'javascriptComment' || lineType =~? '^jsDoc' || lineType =~? '^javascriptDoc'
 endfunction
 " }}}
 
