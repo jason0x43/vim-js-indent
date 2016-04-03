@@ -194,7 +194,7 @@ endfunction
 function! s:IsInBlockComment(lnum, cnum)
 	let lineType = synIDattr(synID(a:lnum, a:cnum, 1), 'name')
 	call s:Log('IsInBlockComment(' . a:lnum . ', ' . a:cnum . '): ' . lineType)
-	return lineType ==? 'javascriptComment' || lineType =~? '^jsDoc' || lineType =~? '^javascriptDoc'
+	return lineType ==? 'jsBlockComment' || lineType ==? 'javascriptComment' || lineType =~? '^jsDoc' || lineType =~? '^javascriptDoc'
 endfunction
 " }}}
 
