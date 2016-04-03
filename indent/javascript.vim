@@ -387,20 +387,16 @@ endfunction
 " }}}
 
 " Switch helpers {{{
-let s:switch_beg_next_line = '\<switch\s*(.*)\s*' . s:js_mid_line_comment . s:js_end_line_comment . '$'
-let s:switch_beg_same_line = '\<switch\s*(.*)\s*' . s:js_mid_line_comment . '{\s*' . s:js_line_comment . '$'
-let s:switch_mid = '^.*\<\(case.*\|default\)\s*:\s*' 
-
 function! s:IsSwitchStartNextLine(line) 
-	return a:line =~ s:switch_beg_next_line 
+	return a:line =~ '\<switch\s*(.*)\s*' . s:js_mid_line_comment . s:js_end_line_comment . '$'
 endfunction
 
 function! s:IsSwitchStartSameLine(line) 
-	return a:line =~ s:switch_beg_same_line 
+	return a:line =~ '\<switch\s*(.*)\s*' . s:js_mid_line_comment . '{\s*' . s:js_line_comment . '$'
 endfunction
 
 function! s:IsSwitchMid(line)
-	return a:line =~ s:switch_mid
+	return a:line =~ '^.*\<\(case.*\|default\)\s*:\s*'
 endfunction 
 " }}}
 
