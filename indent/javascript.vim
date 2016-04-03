@@ -248,7 +248,7 @@ function! s:GetNonLineCommentLine(lnum)
 
 	while lnum > 0
 		call s:Log('checking if line ' . lnum . ' is line comment...')
-		if s:IsLineComment(lnum)
+		if s:IsLineComment(getline(lnum))
 			call s:Log('line ' . lnum . ' is line comment')
 			let lnum = prevnonblank(lnum - 1)
 		else
