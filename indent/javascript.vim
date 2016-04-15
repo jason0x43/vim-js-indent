@@ -43,7 +43,7 @@ setlocal autoindent
 
 " Inline comments (for anchoring other statements)
 let s:js_mid_line_comment = '\s*\(\/\*.*\*\/\)*\s*'
-let s:js_end_line_comment = s:js_mid_line_comment . '\s*\(\/\/.*\)*'
+let s:js_end_line_comment = s:js_mid_line_comment . '\s*\([^:]\\?\/\/.*\)*'
 let s:js_line_comment = s:js_end_line_comment
 
 " Comment/string syntax key
