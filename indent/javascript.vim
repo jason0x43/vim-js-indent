@@ -14,8 +14,6 @@ let b:did_indent = 1
 
 " Options
 " ------------------------------------------------------------------------------
-let g:js_indent_logging = 1
-
 " set to 1 to make case statements align with the containing switch
 if !exists('g:js_indent_flat_switch')
 	let g:js_indent_flat_switch = 0
