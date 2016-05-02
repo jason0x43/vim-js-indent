@@ -94,4 +94,23 @@ return function webpackDevMiddleware(context, next) {
 	});
 }
 
+var foo = something === 'bar' ||
+	(index > start + 1 && index < start + 4);
+
+exports.creator = function (param) {
+	var qux = this.create('thing', {
+		foo: 'foo',
+		bar: 'bar'
+	}, 'bar', 'baz');
+
+	qux.addEventListener('load', function () {
+		doSomething();
+	});
+}
+
+this.on('[type="checkbox"]:change', function (event) {
+	var checkbox = event.target;
+	var isChecked = checkbox.checked;
+});
+
 // vim:noexpandtab tabstop=4
