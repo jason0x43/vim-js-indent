@@ -19,7 +19,7 @@ if !exists('g:js_indent_flat_switch')
 	let g:js_indent_flat_switch = 0
 endif
 
-" set to 1 to make case statements align with the containing switch
+" set to 1 to enable debug logging
 if !exists('g:js_indent_logging')
 	let g:js_indent_logging = 0
 endif
@@ -68,6 +68,7 @@ let s:js_end_line_comment = s:js_mid_line_comment . s:js_line_comment
 " Indenter
 " ----------------------------------------------------------------------------
 function GetJsIndent(lnum)
+	call s:Log('>> Getting JS indent for ', a:lnum)
 	" This calls a helper method so we can easily log the final indent value
 	" (GetIndent has many return points).
 	let ind = s:GetIndent(a:lnum)
@@ -140,15 +141,15 @@ function s:GetIndent(lnum)
 	endif
 
 	call s:Log('>> Checking if previous non-blank line (', pnbnum,
-				\ ') ends a multi-line declaration or assignment')
-	if s:EndsMultiLineVar(pnbnum) || s:EndsMultiLineAssignment(pnbnum)
-		return ind - s:sw()
-	endif
-
-	call s:Log('>> Checking if previous non-blank line (', pnbnum,
 				\ ') ends by closing a container')
 	if s:ClosesContainerAtEnd(pnbnum)
 		return indent(s:GetContainerStart(pnbnum, 1))
+	endif
+
+	call s:Log('>> Checking if previous non-blank line (', pnbnum,
+				\ ') ends a multi-line declaration or assignment')
+	if s:EndsMultiLineVar(pnbnum) || s:EndsMultiLineAssignment(pnbnum)
+		return ind - s:sw()
 	endif
 
 	call s:Log('>> Checking if previous non-blank line (', pnbnum,
@@ -480,7 +481,7 @@ endfunction
 " Returns a non-zero number if a line opens a container without closing it, or
 " closes a previously open container.
 function s:OpensOrClosesContainer(lnum, closes)
-	let line = s:StripComments(a:lnum)
+	let line = s:StripComments(getline(a:lnum))
 	let len = strlen(line)
 
 	if a:closes
@@ -565,7 +566,10 @@ endfunction
 "         + d;
 "
 function s:StartsMultiLineAssignment(lnum)
-	let line = s:StripComments(a:lnum)
+	let line = s:StripComments(getline(a:lnum))
+	call s:Log('  no comments: ', line)
+	let line = s:StripStrings(line)
+	call s:Log('  no strings: ', line)
 	let result = line =~ '\w\S*\s*=[^>]' && line !~ '=[^>].*[;,]\s*$'
 	call s:Log('StartsMultiLineAssignment(', line, '): ', result)
 	return result
@@ -584,9 +588,17 @@ function s:StartsMultiLineVar(lnum)
 endfunction
 
 " Returns a string that is the given line with all comments removed.
-function s:StripComments(lnum)
-	let line = substitute(getline(a:lnum), '^.*\*\/', '', '')
+function s:StripComments(line)
+	let line = substitute(a:line, '^.*\*\/', '', '')
 	let line = substitute(line, s:js_mid_line_comment, '', 'g')
 	let line = substitute(line, s:js_end_line_comment, '', '')
+	return line
+endfunction 
+
+" Returns a string that is the given line with all strings removed. This
+" function assumes strings open and close on a single line.
+function s:StripStrings(line)
+	let line = substitute(a:line, "'.\\{-}[^\\\\]'", '', 'g')
+	let line = substitute(line, '".\{-}[^\\]"', '', 'g')
 	return line
 endfunction 
