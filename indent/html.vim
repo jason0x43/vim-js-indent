@@ -935,7 +935,9 @@ func! HtmlIndent()
     let foundHtmlString = 0
     for synid in reverse(stack)
       let name = synIDattr(synid, "name")
-      if index(b:hi_insideStringNames, name) >= 0
+	  if name == 'javaScript'
+          return eval(s:js_indent_expr)
+	  elseif index(b:hi_insideStringNames, name) >= 0
         let foundHtmlString = 1
       elseif index(b:hi_insideTagNames, name) >= 0
         " Yes, we are inside a tag.
@@ -1032,4 +1034,4 @@ call HtmlIndent_CheckUserSettings()
 let &cpo = s:cpo_save
 unlet s:cpo_save
 
-" vim: fdm=marker ts=8 sw=2 tw=78
+" vim: ts=4 sw=4 tw=78
