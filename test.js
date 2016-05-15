@@ -113,4 +113,18 @@ this.on('[type="checkbox"]:change', function (event) {
 	var isChecked = checkbox.checked;
 });
 
+for (var i = 0; i < links.length; i++) {
+	range.selectNodeContents(links[i]);
+	console.log('text: ' + range.toString());
+}
+
+if (resultOrError instanceof Error) {
+	throw resultOrError;
+}
+else if (resultOrError === null) {
+	var error = new Error('Polling timed out with no result');
+	error.name = 'ScriptTimeout';
+	throw error;
+}
+
 // vim:noexpandtab tabstop=4

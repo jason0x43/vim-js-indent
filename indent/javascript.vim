@@ -65,6 +65,8 @@ let s:js_line_comment = '\(\/\/.*\)\?'
 let s:js_mid_line_comment = '\(\/\*.*\*\/\s*\)*'
 let s:js_end_line_comment = s:js_mid_line_comment . s:js_line_comment
 
+let s:fluent_accessor = '^\s*\.\w'
+
 " Indenter
 " ----------------------------------------------------------------------------
 function GetJsIndent(lnum)
@@ -131,6 +133,12 @@ function s:GetIndent(lnum)
 				return indent(csnum) + s:sw()
 			endif
 		endif
+	endif
+
+	call s:Log('>> Checking if this line (', a:lnum,
+				\ ') start a fluent chain')
+	if s:StartsFluentAccess(a:lnum)
+		return ind + s:sw()
 	endif
 
 	call s:Log('>> Checking if previous non-blank line (', pnbnum,
@@ -560,7 +568,20 @@ function s:SearchForPairStart(lnum, cnum, beg, end)
 	return s:SearchForPair(a:lnum, a:cnum, a:beg, a:end, 1)
 endfunction
 
-" Return true if a line starts a multi-line assignment, like
+" Returns true if a line is the first line of a fluent function call chain
+function s:StartsFluentAccess(lnum)
+	let line = getline(a:lnum)
+	let result = line =~ s:fluent_accessor
+	if result 
+		let pnbnum = prevnonblank(a:lnum - 1)
+		let pnbline = getline(pnbnum)
+		let result = pnbline !~ s:fluent_accessor
+	endif
+	call s:Log('StartsFluentAccess(', line, '): ', result)
+	return result
+endfunction
+
+" Returns true if a line starts a multi-line assignment, like
 "
 "     var x = a + b + c   <---
 "         + d;
@@ -570,7 +591,9 @@ function s:StartsMultiLineAssignment(lnum)
 	call s:Log('  no comments: ', line)
 	let line = s:StripStrings(line)
 	call s:Log('  no strings: ', line)
-	let result = line =~ '\w\S*\s*=[^>]' && line !~ '=[^>].*[;,]\s*$'
+	" Count lines that have "x = something" but that don't end with ; or , or
+	" {
+	let result = line =~ '\w\S*\s*=[^>]' && line !~ '=[^>].*[;,{]\s*$'
 	call s:Log('StartsMultiLineAssignment(', line, '): ', result)
 	return result
 endfunction 
