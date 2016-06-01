@@ -274,7 +274,7 @@ function s:GetContainerStart(lnum, fromEnd)
 					\ '\zs[})\]]')
 	endif 
 
-	call s:LOg('  getting start for ', a:lnum, ' fromEnd=', a:fromEnd)
+	call s:Log('  getting start for ', a:lnum, ' fromEnd=', a:fromEnd)
 
 	let container_char = line[container_char_idx]
 
@@ -398,7 +398,7 @@ function s:IsComment(lnum)
 	let line = getline(a:lnum)
 	let result = line =~ '^\s*\/\/.*$'
 	if !result 
-		let result = s:IsInBlockComment(lnum)
+		let result = s:IsInBlockComment(a:lnum)
 	endif
 	call s:Log('IsComment(', line, '): ', result)
 	return result
@@ -414,7 +414,7 @@ function s:IsInBlockComment(lnum)
 	let lineType = synIDattr(synID(a:lnum, 1, 1), 'name')
 	let result = lineType == 'javascriptComment' ||
 				\ lineType == 'jsBlockComment'
-	call s:Log('IsInBlockComment(' . a:lnum . ', ' . a:cnum . '): ' . result)
+	call s:Log('IsInBlockComment(' . a:lnum . '): ' . result)
 	return result
 endfunction
 
@@ -532,7 +532,6 @@ endfunction
 function s:SearchForPair(lnum, cnum, beg, end, backwards)
 	" Save the cursor position
 	let curpos = getpos(".")
-	let syn_non_code = 
 
 	call cursor(a:lnum, a:cnum)
 
