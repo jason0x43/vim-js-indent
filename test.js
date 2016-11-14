@@ -127,4 +127,12 @@ else if (resultOrError === null) {
 	throw error;
 }
 
+if (
+	this.browserName === 'safari' &&
+	this.platform === 'MAC' &&
+	this.platformName !== 'ios'
+) {
+	console.log('foo');
+}
+
 // vim:noexpandtab tabstop=4
